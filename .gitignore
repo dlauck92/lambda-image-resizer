@@ -134,3 +134,48 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+out/
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux system files
+*~
+
+# Python virtual environments
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+*.save
+
+# EditorConfig
+.editorconfig
+
+# Prettier
+.prettierignore
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
