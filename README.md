@@ -1,24 +1,40 @@
 # Lambda Image Resizer
 
-This project is an AWS Lambda function that automatically resizes images uploaded to an S3 bucket. When an image is uploaded to the `images/` folder in the bucket, the function resizes it into multiple sizes and uploads the resized images to corresponding prefixes (`thumbnails/`, `medium/`, and `large/`).
+A serverless AWS Lambda function that automatically resizes images uploaded to an S3 bucket using the [sharp](https://github.com/lovell/sharp) image processing library.
 
 ## Features
-- Automatically resizes images to predefined dimensions.
-- Uses the `sharp` library for image processing.
-- Uploads resized images to S3 with organized prefixes.
+
+- ✅ Resizes images to specified dimensions
+- ☁️ Triggered by S3 upload events
+- 🧠 Uses the `sharp` library for fast processing
+- 🪶 Stores the resized image in a target S3 bucket
 
 ---
 
-## Setup Instructions
+## 📦 Setup Instructions
 
-### 1. Install Dependencies
-To ensure compatibility with the AWS Lambda runtime (`linux-x64`), install `sharp` with the following command:
+### 1. Clone the Repo
+
 ```bash
-npm install --os=linux --cpu=x64 sharp
+git clone https://github.com/dlauck92/lambda-image-resizer.git
+cd lambda-image-resizer
 ```
 
-### 2. Configure IAM Role Permissions
-Ensure the Lambda function's IAM role has the necessary permissions to access and modify objects in the S3 bucket. Attach the following policy to the IAM role:
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+---
+
+## ☁️ AWS Configuration
+
+### Step 1: Create IAM Policy
+
+Create a policy that allows access to the source and destination S3 buckets.
+
+#### Example Policy (resize-image-s3-policy.json)
 
 ```json
 {
@@ -30,78 +46,132 @@ Ensure the Lambda function's IAM role has the necessary permissions to access an
         "s3:GetObject",
         "s3:PutObject"
       ],
-      "Resource": "arn:aws:s3:::<bucket-name>/*"
+      "Resource": [
+        "arn:aws:s3:::YOUR_SOURCE_BUCKET_NAME/*",
+        "arn:aws:s3:::YOUR_DEST_BUCKET_NAME/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
     }
   ]
 }
 ```
-Replace `<bucket-name>` with the name of your S3 bucket.
 
-### 3. Deploy the Lambda Function
-1. Package the Lambda function:
-   ```bash
-   zip -r lambda-img-resizer.zip index.js node_modules
-   ```
-2. Upload the `lambda-img-resizer.zip` file to your Lambda function in the AWS Management Console.
+#### Create the Policy
 
-### 4. Configure S3 Trigger
-Set up an S3 event notification to trigger the Lambda function when objects are uploaded to the `images/` prefix.
-
----
-
-## How It Works
-1. The Lambda function is triggered when an image is uploaded to the `images/` prefix in the S3 bucket.
-2. The function:
-   - Fetches the original image from S3.
-   - Resizes the image into three sizes:
-     - **Thumbnails**: 150px width.
-     - **Medium**: 600px width.
-     - **Large**: 1200px width.
-   - Uploads the resized images to the corresponding prefixes (`thumbnails/`, `medium/`, `large/`).
-
----
-
-## Troubleshooting
-
-### Issue: `sharp` Not Working in Lambda
-- **Error**: `Input file is missing` or `sharp module not found`.
-- **Solution**: Ensure `sharp` is installed with the correct platform flags:
-  ```bash
-  npm install --os=linux --cpu=x64 sharp
-  ```
-
-### Issue: Permissions Error
-- **Cause**: The Lambda function lacks the necessary permissions to access or upload to S3.
-- **Solution**: Ensure the Lambda function's IAM role has the correct permissions (see the IAM policy above).
-
----
-
-## Code Overview
-
-### Main Function
-The function processes the image and uploads resized versions:
-```javascript
-exports.handler = async (event) => {
-  // Fetch image, resize, and upload logic
-};
-```
-
-### Helper Function
-Converts S3 object streams to buffers for compatibility with `sharp`:
-```javascript
-const streamToBuffer = async (stream) => {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-    stream.on('error', reject);
-  });
-};
+```bash
+aws iam create-policy \
+  --policy-name ResizeImageS3Policy \
+  --policy-document file://resize-image-s3-policy.json
 ```
 
 ---
 
-## Additional Notes
-- The project uses the AWS SDK v3 (`@aws-sdk/client-s3`) for S3 operations.
-- Ensure the Lambda runtime is compatible with Node.js 18 or later.
+### Step 2: Create IAM Role for Lambda
 
+Create a trust policy for Lambda:
+
+#### Trust Policy (trust-policy.json)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+#### Create the Role
+
+```bash
+aws iam create-role \
+  --role-name LambdaImageResizerRole \
+  --assume-role-policy-document file://trust-policy.json
+```
+
+---
+
+### Step 3: Attach Policy to Role
+
+```bash
+aws iam attach-role-policy \
+  --role-name LambdaImageResizerRole \
+  --policy-arn arn:aws:iam::YOUR_ACCOUNT_ID:policy/ResizeImageS3Policy
+```
+
+Replace `YOUR_ACCOUNT_ID` with your actual AWS account ID.
+
+---
+
+### Step 4: Create the Lambda Function
+
+#### Package the Function
+
+```bash
+zip -r function.zip .
+```
+
+#### Create the Lambda Function
+
+```bash
+aws lambda create-function \
+  --function-name image-resizer \
+  --runtime nodejs18.x \
+  --role arn:aws:iam::YOUR_ACCOUNT_ID:role/LambdaImageResizerRole \
+  --handler index.handler \
+  --timeout 10 \
+  --memory-size 512 \
+  --zip-file fileb://function.zip \
+  --environment Variables="{DEST_BUCKET=your-destination-bucket,MAX_WIDTH=800,MAX_HEIGHT=800}"
+```
+
+---
+
+### Step 5: Set Up S3 Trigger
+
+1. Go to the **S3 Console**, select your **source bucket**.
+2. Go to **Properties** > **Event Notifications**.
+3. Create a new event:
+   - Event Name: `image-upload`
+   - Event Type: `PUT`
+   - Prefix: (optional, e.g., `uploads/`)
+   - Destination: Lambda Function → `image-resizer`
+
+Make sure Lambda has permission to be invoked by S3. AWS usually prompts for this automatically.
+
+---
+
+## 🧪 Testing
+
+Upload an image to your source S3 bucket:
+
+```bash
+aws s3 cp ./example.jpg s3://your-source-bucket/uploads/
+```
+
+The resized image will appear in your destination bucket.
+
+---
+
+## 🧾 License
+
+MIT License © [Drew Lauck](https://github.com/dlauck92)
+```
+
+---
+
+Let me know if you’d like to automate this with a deployment script or IaC (like Terraform or CloudFormation)!
