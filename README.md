@@ -171,7 +171,3 @@ The resized image will appear in your destination bucket.
 
 MIT License © [Drew Lauck](https://github.com/dlauck92)
 ```
-
----
-
-Let me know if you’d like to automate this with a deployment script or IaC (like Terraform or CloudFormation)!
