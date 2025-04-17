@@ -170,4 +170,3 @@ The resized image will appear in your destination bucket.
 ## 🧾 License
 
 MIT License © [Drew Lauck](https://github.com/dlauck92)
-```
